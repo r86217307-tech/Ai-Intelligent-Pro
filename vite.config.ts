@@ -11,6 +11,12 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    define: {
+      'import.meta.env.VITE_DEFAULT_API_BASE_URL': JSON.stringify(
+        process.env.VITE_API_BASE_URL || 
+        "https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app"
+      )
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "Analysis": {
+      "title": "Analysis",
+      "description": "Recorded SMC chart analysis and trade signal",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Identifier of the creator/user"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "broker": {
+          "type": "string"
+        },
+        "marketMode": {
+          "type": "string"
+        },
+        "timeframe": {
+          "type": "string"
+        },
+        "bias": {
+          "type": "string"
+        },
+        "signal": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": ["userId", "asset", "broker", "signal"]
+    },
+    "TestRecord": {
+      "title": "TestRecord",
+      "description": "Recorded automated test trade or mock signal execution",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "broker": {
+          "type": "string"
+        },
+        "signal": {
+          "type": "string"
+        },
+        "actualResult": {
+          "type": "string"
+        },
+        "testResult": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": ["userId", "asset", "broker", "signal"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "User custom interface preferences and risk profiles",
+      "type": "object",
+      "properties": {
+        "broker": {
+          "type": "string"
+        },
+        "defaultAsset": {
+          "type": "string"
+        },
+        "riskPerTrade": {
+          "type": "number"
+        },
+        "maxDailyLoss": {
+          "type": "number"
+        },
+        "autoAnalysis": {
+          "type": "boolean"
+        },
+        "soundEnabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/analyses/{analysisId}": {
+      "schema": "Analysis",
+      "description": "Stored SMC chart analysis history"
+    },
+    "/test_history/{testId}": {
+      "schema": "TestRecord",
+      "description": "Stored backtest records"
+    },
+    "/settings/{userId}": {
+      "schema": "AppSettings",
+      "description": "Persistent user settings"
+    }
+  }
+}

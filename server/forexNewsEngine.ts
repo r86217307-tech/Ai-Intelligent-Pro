@@ -473,7 +473,7 @@ ${JSON.stringify(inputContract, null, 2)}`;
     for (const modelName of candidateModels) {
       try {
         const timeoutPromise = new Promise<null>((resolve) => {
-          setTimeout(() => resolve(null), 4000);
+          setTimeout(() => resolve(null), 10000);
         });
 
         const aiPromise = (async () => {

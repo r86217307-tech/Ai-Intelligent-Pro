@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, X, Activity, ShieldAlert, ChevronRight, ChevronLeft, Zap, ArrowUp, ArrowDown, RefreshCw, AlertCircle, Sparkles, Play } from "lucide-react";
 import toast from "react-hot-toast";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { AnalysisResult, SignalHistory } from "../types";
 import { getStoredSettings } from "../lib/settings";
@@ -97,6 +97,7 @@ export default function Analyzer() {
       });
     } catch (e) {
       console.error("Failed to save history to Firestore", e);
+      handleFirestoreError(e, OperationType.CREATE, "analyses");
     }
   };
 

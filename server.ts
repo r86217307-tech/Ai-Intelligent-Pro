@@ -116,7 +116,9 @@ app.use((req, res, next) => {
       origin.startsWith("capacitor://") || 
       origin.startsWith("http://localhost") || 
       origin.startsWith("https://localhost") || 
-      origin.startsWith("http://127.0.0.1")
+      origin.startsWith("http://127.0.0.1") ||
+      origin.startsWith("https://ai.sufia.trader") ||
+      origin.startsWith("http://ai.sufia.trader")
     ) {
       allowed = true;
     } else {
@@ -575,9 +577,9 @@ PHASE 12 MARKET STRUCTURE DETECTION & DECISION RULES:
       
       // Fast Model Pipeline: Prioritize available environment model with zero-thinking ultra-fast vision
       const modelsToTry: { name: string; timeoutMs: number; zeroThinking?: boolean; thinkingLevel?: any }[] = [
-        { name: "gemini-3.7-flash", timeoutMs: 30000, zeroThinking: true },
-        { name: "gemini-2.5-flash", timeoutMs: 30000, zeroThinking: true },
-        { name: "gemini-3.1-flash-lite", timeoutMs: 30000, zeroThinking: true },
+        { name: "gemini-2.5-flash", timeoutMs: 15000, zeroThinking: true },
+        { name: "gemini-3.7-flash", timeoutMs: 15000, zeroThinking: true },
+        { name: "gemini-3.1-flash-lite", timeoutMs: 15000, zeroThinking: true },
       ];
       
       let rawResponseText = "";
@@ -652,6 +654,13 @@ PHASE 12 MARKET STRUCTURE DETECTION & DECISION RULES:
             // If 404 (model not found/deprecated), mark indefinitely cooled down so we don't try again
             if (err?.status === 404 || errMsg.includes("not found") || errMsg.includes("not available")) {
               modelCooldownMap.set(modelName, Date.now() + 86400000);
+              break;
+            }
+
+            // If a timeout occurred, mark model in cooldown for 3 minutes so we failover immediately on next requests
+            if (errMsg.includes("timeout_") || errMsg.includes("timed out") || errMsg.includes("deadline exceeded")) {
+              modelCooldownMap.set(modelName, Date.now() + 180000);
+              console.log(`[ANALYSIS] Marked ${modelName} in cooldown for 180s due to timeout.`);
               break;
             }
 

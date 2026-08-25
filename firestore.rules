@@ -1,23 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isKeyUser(userId) {
+      return userId is string && userId.startsWith('key_user_') && userId.size() <= 128;
+    }
+
+    function isAuthorizedUser(userId) {
+      return (request.auth != null && request.auth.uid == userId) || isKeyUser(userId);
+    }
+
+    function isAuthorizedData(data) {
+      return (request.auth != null && data.userId == request.auth.uid) || isKeyUser(data.userId);
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthorizedUser(userId);
     }
+
     match /analyses/{analysisId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if isAuthorizedData(resource.data);
+      allow create: if isAuthorizedData(request.resource.data);
+      allow update: if isAuthorizedData(resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthorizedData(resource.data);
     }
+
     match /test_history/{testId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if isAuthorizedData(resource.data);
+      allow create: if isAuthorizedData(request.resource.data);
+      allow update: if isAuthorizedData(resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthorizedData(resource.data);
     }
+
     match /settings/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthorizedUser(userId);
     }
   }
 }

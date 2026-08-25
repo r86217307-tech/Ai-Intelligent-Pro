@@ -25,6 +25,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
+var import_dotenv = __toESM(require("dotenv"), 1);
 var import_genai2 = require("@google/genai");
 var import_multer = __toESM(require("multer"), 1);
 var import_ws = require("ws");
@@ -412,7 +413,7 @@ ${JSON.stringify(inputContract, null, 2)}`;
     for (const modelName of candidateModels) {
       try {
         const timeoutPromise = new Promise((resolve) => {
-          setTimeout(() => resolve(null), 4e3);
+          setTimeout(() => resolve(null), 1e4);
         });
         const aiPromise = (async () => {
           try {
@@ -813,6 +814,7 @@ async function analyzeForexPairNews(pair, genAIInstance) {
 }
 
 // server.ts
+import_dotenv.default.config();
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[Server Process] Unhandled Rejection at:", promise, "reason:", reason);
 });
@@ -866,6 +868,7 @@ app.use((req, res, next) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "display-capture=*, microphone=*");
   const decodedPath = decodeURIComponent(req.path).toLowerCase();
   const isViteDevRoute = req.path.startsWith("/@") || req.path.startsWith("/src") || req.path.startsWith("/node_modules") || req.path.startsWith("/public");
   if (!isViteDevRoute) {
@@ -876,6 +879,31 @@ app.use((req, res, next) => {
         message: "Access to private system resources is restricted."
       });
     }
+  }
+  const origin = req.headers.origin;
+  if (origin) {
+    let allowed = false;
+    if (origin.startsWith("capacitor://") || origin.startsWith("http://localhost") || origin.startsWith("https://localhost") || origin.startsWith("http://127.0.0.1") || origin.startsWith("https://ai.sufia.trader") || origin.startsWith("http://ai.sufia.trader")) {
+      allowed = true;
+    } else {
+      try {
+        const originUrl = new URL(origin);
+        const hostname = originUrl.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".run.app") || hostname.endsWith(".google.com")) {
+          allowed = true;
+        }
+      } catch (e) {
+      }
+    }
+    if (allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
@@ -1277,10 +1305,9 @@ PHASE 12 MARKET STRUCTURE DETECTION & DECISION RULES:
       ];
       const tAiStart = performance.now();
       const modelsToTry = [
-        { name: "gemini-3.7-flash", timeoutMs: 25e3, zeroThinking: true },
-        { name: "gemini-flash-latest", timeoutMs: 25e3, zeroThinking: true },
-        { name: "gemini-3.1-flash-lite", timeoutMs: 25e3, zeroThinking: true },
-        { name: "gemini-2.5-flash", timeoutMs: 25e3, zeroThinking: true }
+        { name: "gemini-2.5-flash", timeoutMs: 15e3, zeroThinking: true },
+        { name: "gemini-3.7-flash", timeoutMs: 15e3, zeroThinking: true },
+        { name: "gemini-3.1-flash-lite", timeoutMs: 15e3, zeroThinking: true }
       ];
       let rawResponseText = "";
       let lastError = null;
@@ -1339,6 +1366,11 @@ PHASE 12 MARKET STRUCTURE DETECTION & DECISION RULES:
             console.warn(`[ANALYSIS] Model ${modelName} attempt ${attempt} failed: ${err?.message || err}`);
             if (err?.status === 404 || errMsg.includes("not found") || errMsg.includes("not available")) {
               modelCooldownMap.set(modelName, Date.now() + 864e5);
+              break;
+            }
+            if (errMsg.includes("timeout_") || errMsg.includes("timed out") || errMsg.includes("deadline exceeded")) {
+              modelCooldownMap.set(modelName, Date.now() + 18e4);
+              console.log(`[ANALYSIS] Marked ${modelName} in cooldown for 180s due to timeout.`);
               break;
             }
             if (errMsg.includes("quota") || errMsg.includes("resource_exhausted") || errMsg.includes("free_tier_requests") || err?.status === 429) {

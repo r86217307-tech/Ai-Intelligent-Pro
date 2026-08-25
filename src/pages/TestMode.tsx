@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { 
   collection, addDoc, query, where, getDocs, orderBy, updateDoc, doc, deleteDoc 
 } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { AnalysisResult, TestRecord } from "../types";
 import { formatDistanceToNow } from "date-fns";
@@ -305,6 +305,7 @@ export default function TestMode() {
             finalRecordId = docRef.id;
           } catch (dbErr) {
             console.error("Failed to save initial test record to Firestore", dbErr);
+            handleFirestoreError(dbErr, OperationType.CREATE, "test_history");
           }
         }
 
