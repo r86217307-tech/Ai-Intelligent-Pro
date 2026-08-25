@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #8b5cf6; /* violet-500 */
+  --color-primary-hover: #7c3aed; /* violet-600 */
+  --color-background: #09090b; /* zinc-950 */
+  --color-surface: #18181b; /* zinc-900 */
+  --color-surface-glass: rgba(24, 24, 27, 0.6);
+  --color-border: #27272a; /* zinc-800 */
+  --color-text: #f4f4f5; /* zinc-50 */
+  --color-text-muted: #a1a1aa; /* zinc-400 */
+  
+  --color-success: #10b981; /* emerald-500 */
+  --color-success-glass: rgba(16, 185, 129, 0.2);
+  --color-danger: #f43f5e; /* rose-500 */
+  --color-danger-glass: rgba(244, 63, 94, 0.2);
+  --color-warning: #f59e0b; /* amber-500 */
+  
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background-color: var(--color-surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+  }
+  
+  .neon-glow-primary {
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+  }
+  
+  .neon-glow-success {
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
+  }
+  
+  .neon-glow-danger {
+    box-shadow: 0 0 25px rgba(244, 63, 94, 0.5);
+  }
+
+  .neon-glow-warning {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+  }
+
+  @keyframes pulseCall {
+    0%, 100% {
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.4), inset 0 0 15px rgba(16, 185, 129, 0.2);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.8), inset 0 0 25px rgba(16, 185, 129, 0.4);
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes pulsePut {
+    0%, 100% {
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.4), inset 0 0 15px rgba(244, 63, 94, 0.2);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 35px rgba(244, 63, 94, 0.8), inset 0 0 25px rgba(244, 63, 94, 0.4);
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes floatUp {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  @keyframes floatDown {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+  }
+
+  .animate-signal-call {
+    animation: pulseCall 2s infinite ease-in-out;
+  }
+
+  .animate-signal-put {
+    animation: pulsePut 2s infinite ease-in-out;
+  }
+
+  .animate-arrow-up {
+    animation: floatUp 1.5s infinite ease-in-out;
+  }
+
+  .animate-arrow-down {
+    animation: floatDown 1.5s infinite ease-in-out;
+  }
+
+  @keyframes laserScan {
+    0% {
+      top: 0%;
+      opacity: 0.8;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes orbitSpin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes orbitSpinReverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes radarPulse {
+    0%, 100% {
+      transform: scale(0.95);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+
+  .animate-laser-scan {
+    animation: laserScan 2.4s ease-in-out infinite alternate;
+  }
+
+  .animate-orbit {
+    animation: orbitSpin 6s linear infinite;
+  }
+
+  .animate-orbit-reverse {
+    animation: orbitSpinReverse 4s linear infinite;
+  }
+
+  .animate-radar-pulse {
+    animation: radarPulse 2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-signal-call,
+    .animate-signal-put,
+    .animate-arrow-up,
+    .animate-arrow-down,
+    .animate-laser-scan,
+    .animate-orbit,
+    .animate-orbit-reverse,
+    .animate-radar-pulse {
+      animation: none !important;
+      transform: none !important;
+    }
+  }
+}

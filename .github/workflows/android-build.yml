@@ -1,0 +1,173 @@
+name: Android Build Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Target binary to build'
+        required: true
+        default: 'debug_apk'
+        type: choice
+        options:
+          - debug_apk
+          - release_apk
+          - release_aab
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 1. Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 3. Install Dependencies
+        run: |
+          npm ci || npm install --include=dev --legacy-peer-deps
+
+      - name: 4. Build Production Web Application
+        run: |
+          echo "Building web application..."
+          npm run build
+
+      - name: 5. Verify Web Build Artifacts
+        run: |
+          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+            echo "::error::Web build failed: dist/index.html not found"
+            exit 1
+          fi
+          echo "Web build verified successfully."
+
+      - name: 6. Capacitor Sync Android
+        env:
+          CAPACITOR_TELEMETRY: "false"
+          CI: "true"
+        run: |
+          echo "Syncing web assets to Capacitor Android project..."
+          npx @capacitor/cli sync android
+
+      - name: 7. Setup Java/JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+          cache-dependency-path: 'android/**/*.gradle*'
+
+      - name: 7b. Verify & Install Android SDK 36 Platform
+        run: |
+          echo "Installing/verifying Android SDK Platform 36..."
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
+
+      - name: 8. Validate and Repair Gradle Wrapper
+        run: |
+          echo "Inspecting Gradle Wrapper..."
+          sed -i 's/\r$//' android/gradlew
+          chmod +x android/gradlew
+          cd android
+          ls -la gradle/wrapper/gradle-wrapper.jar
+          
+          # Test if gradle-wrapper.jar can be executed by Java
+          if ! java -jar gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
+            echo "::warning::gradle-wrapper.jar is invalid or corrupted! Regenerating Gradle 8.11.1 Wrapper..."
+            gradle wrapper --gradle-version 8.11.1 --distribution-type all
+            chmod +x gradlew
+          else
+            echo "gradle-wrapper.jar is valid."
+          fi
+          
+          echo "Verifying Gradle Wrapper..."
+          ./gradlew --version
+
+      - name: 9. Decode Keystore (If CI Secrets Configured)
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding release keystore from CI secret..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release keystore secret not found. Using debug/unsigned signing."
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
+      # -------------------------------------------------------------
+      # DEBUG APK BUILD
+      # -------------------------------------------------------------
+      - name: 10. Build Debug APK
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
+        run: |
+          echo "Building Debug APK..."
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: 11. Upload Debug APK Artifact
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sufia-ai-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # -------------------------------------------------------------
+      # RELEASE APK BUILD
+      # -------------------------------------------------------------
+      - name: 12. Build Release APK
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Building Release APK..."
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 13. Upload Release APK Artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sufia-ai-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      # -------------------------------------------------------------
+      # RELEASE AAB BUILD (Google Play Store Bundle)
+      # -------------------------------------------------------------
+      - name: 14. Build Release AAB (Android App Bundle)
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Building Release AAB Bundle for Play Store..."
+          cd android
+          ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: 15. Upload Release AAB Artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sufia-ai-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: warn
+          retention-days: 30

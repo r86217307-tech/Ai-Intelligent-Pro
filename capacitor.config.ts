@@ -1,0 +1,36 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'ai.sufia.trader',
+  appName: 'Sufia AI',
+  webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+    cleartext: false,
+    allowNavigation: [
+      '*.run.app',
+      '*.googleapis.com'
+    ]
+  },
+  android: {
+    allowMixedContent: false,
+    captureInput: true,
+    backgroundColor: '#090A0F',
+    webContentsDebuggingEnabled: false
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1500,
+      backgroundColor: '#090A0F',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP'
+    },
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#090A0F',
+      overlaysWebView: true
+    }
+  }
+};
+
+export default config;
