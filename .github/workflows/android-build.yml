@@ -30,34 +30,36 @@ jobs:
 
     steps:
 
-      # -------------------------------------------------------------
-      # 1. CHECKOUT SOURCE CODE
-      # -------------------------------------------------------------
+      # =============================================================
+      # 1. CHECKOUT
+      # =============================================================
+
       - name: 1. Checkout Source Code
         uses: actions/checkout@v4
 
-      # -------------------------------------------------------------
-      # 2. SETUP NODE.JS 24
-      # -------------------------------------------------------------
-      - name: 2. Setup Node.js 24 LTS
+
+      # =============================================================
+      # 2. NODE.JS 24
+      # =============================================================
+
+      - name: 2. Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: "npm"
 
-      # -------------------------------------------------------------
-      # 3. VERIFY NODE / NPM
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 3. VERIFY NODE
+      # =============================================================
+
       - name: 3. Verify Node.js Environment
         run: |
           echo "======================================"
           echo "Node.js Environment"
           echo "======================================"
 
-          echo "Node version:"
           node --version
-
-          echo "NPM version:"
           npm --version
 
           echo "Node executable:"
@@ -66,30 +68,33 @@ jobs:
           echo "NPM executable:"
           which npm
 
-          node -e "console.log('Node major version:', process.versions.node.split('.')[0])"
+          echo "Node major version:"
+          node -e "console.log(process.versions.node.split('.')[0])"
 
-      # -------------------------------------------------------------
-      # 4. SETUP JAVA JDK 21
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 4. JAVA JDK 21
+      # =============================================================
+
       - name: 4. Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "21"
-          cache: "gradle"
-          cache-dependency-path: |
-            android/**/*.gradle*
-            android/**/gradle-wrapper.properties
 
-      # -------------------------------------------------------------
-      # 5. SETUP ANDROID SDK
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 5. ANDROID SDK
+      # =============================================================
+
       - name: 5. Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 6. INSTALL ANDROID SDK 36
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 6. Install Android SDK 36
         run: |
           echo "======================================"
@@ -101,25 +106,30 @@ jobs:
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-          echo "Accepting Android SDK licenses..."
           yes | sdkmanager --licenses > /dev/null || true
 
-          echo "Android SDK setup completed."
+          echo "Android SDK ready."
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 7. INSTALL NPM DEPENDENCIES
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 7. Install Dependencies
         run: |
-          echo "Installing npm dependencies..."
+          echo "======================================"
+          echo "Installing npm dependencies"
+          echo "======================================"
 
           npm install --legacy-peer-deps
 
-          echo "Dependencies installed successfully."
+          echo "Dependencies installed."
 
-      # -------------------------------------------------------------
-      # 8. VERIFY CAPACITOR CLI
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 8. VERIFY CAPACITOR
+      # =============================================================
+
       - name: 8. Verify Capacitor CLI
         run: |
           echo "======================================"
@@ -132,12 +142,14 @@ jobs:
           echo "NPM:"
           npm -v
 
-          echo "Capacitor CLI:"
+          echo "Capacitor:"
           npx cap --version
 
-      # -------------------------------------------------------------
-      # 9. BUILD WEB APPLICATION
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 9. BUILD WEB APP
+      # =============================================================
+
       - name: 9. Build Production Web Application
         run: |
           echo "======================================"
@@ -146,12 +158,14 @@ jobs:
 
           npm run build
 
-      # -------------------------------------------------------------
-      # 10. VERIFY WEB BUILD
-      # -------------------------------------------------------------
-      - name: 10. Verify Web Build Artifacts
+
+      # =============================================================
+      # 10. VERIFY DIST
+      # =============================================================
+
+      - name: 10. Verify Web Build
         run: |
-          echo "Checking web build..."
+          echo "Checking dist directory..."
 
           if [ ! -d "dist" ]; then
             echo "::error::dist directory not found."
@@ -165,12 +179,13 @@ jobs:
 
           echo "Web build verified successfully."
 
-          echo "dist contents:"
           ls -la dist
 
-      # -------------------------------------------------------------
-      # 11. CAPACITOR SYNC ANDROID
-      # -------------------------------------------------------------
+
+      # =============================================================
+      # 11. CAPACITOR SYNC
+      # =============================================================
+
       - name: 11. Capacitor Sync Android
         env:
           CAPACITOR_TELEMETRY: "false"
@@ -186,31 +201,30 @@ jobs:
           echo "Capacitor:"
           npx cap --version
 
-          echo "Syncing Android project..."
+          echo "Running Capacitor sync..."
 
           npx cap sync android
 
-          echo "Capacitor sync completed successfully."
+          echo "Capacitor sync completed."
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 12. VERIFY ANDROID PROJECT
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 12. Verify Android Project
         run: |
-          echo "Checking Android project..."
+          echo "======================================"
+          echo "Verifying Android Project"
+          echo "======================================"
 
           if [ ! -d "android" ]; then
-            echo "::error::Android directory not found."
+            echo "::error::android directory not found."
             exit 1
           fi
 
           if [ ! -f "android/gradlew" ]; then
-            echo "::error::Gradle wrapper not found."
-            exit 1
-          fi
-
-          if [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "::error::gradle-wrapper.jar not found."
+            echo "::error::android/gradlew not found."
             exit 1
           fi
 
@@ -219,49 +233,104 @@ jobs:
             exit 1
           fi
 
-          echo "Android project verified successfully."
+          echo "Android project exists."
 
-      # -------------------------------------------------------------
-      # 13. PREPARE GRADLE WRAPPER
-      # -------------------------------------------------------------
-      - name: 13. Prepare Gradle Wrapper
+
+      # =============================================================
+      # 13. REPAIR GRADLE WRAPPER
+      # =============================================================
+
+      - name: 13. Repair Gradle Wrapper
         run: |
           echo "======================================"
-          echo "Preparing Gradle Wrapper"
+          echo "Repairing Gradle Wrapper"
           echo "======================================"
 
-          cd android
+          GRADLE_VERSION="8.11.1"
+          TEMP_DIR="$RUNNER_TEMP/gradle-repair"
+
+          rm -rf "$TEMP_DIR"
+          mkdir -p "$TEMP_DIR"
+
+          echo "Gradle version: $GRADLE_VERSION"
+
+          cd "$TEMP_DIR"
+
+          echo "Downloading Gradle $GRADLE_VERSION..."
+
+          curl -L \
+            --fail \
+            --retry 3 \
+            --connect-timeout 30 \
+            -o gradle.zip \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+
+          echo "Extracting Gradle..."
+
+          unzip -q gradle.zip
+
+          echo "Generating fresh Gradle Wrapper..."
+
+          cd "gradle-${GRADLE_VERSION}"
+
+          mkdir -p "$GITHUB_WORKSPACE/android/gradle/wrapper"
+
+          ./bin/gradle \
+            -p "$GITHUB_WORKSPACE/android" \
+            wrapper \
+            --gradle-version "$GRADLE_VERSION" \
+            --distribution-type all \
+            --no-daemon
+
+          echo "Fresh Gradle wrapper generated."
+
+          cd "$GITHUB_WORKSPACE/android"
 
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
 
-          echo "Gradle wrapper properties:"
+          echo "======================================"
+          echo "Gradle Wrapper Properties"
+          echo "======================================"
+
           cat gradle/wrapper/gradle-wrapper.properties
 
-          echo "Checking Gradle wrapper JAR..."
+          echo "======================================"
+          echo "Checking Wrapper JAR"
+          echo "======================================"
 
           if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "::error::gradle-wrapper.jar is empty or missing."
+            echo "::error::Gradle wrapper JAR is missing or empty."
             exit 1
           fi
 
-          echo "Gradle wrapper JAR found."
+          echo "Wrapper JAR exists."
 
-          echo "Testing Gradle wrapper..."
+          echo "======================================"
+          echo "Testing Gradle Wrapper"
+          echo "======================================"
 
           ./gradlew --version
 
-      # -------------------------------------------------------------
-      # 14. DECODE RELEASE KEYSTORE
-      # -------------------------------------------------------------
+          echo "Gradle wrapper is working."
+
+
+      # =============================================================
+      # 14. DECODE KEYSTORE
+      # =============================================================
+
       - name: 14. Decode Release Keystore
         id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          echo "======================================"
+          echo "Release Keystore"
+          echo "======================================"
+
           if [ -n "$KEYSTORE_BASE64" ]; then
 
-            echo "Release keystore secret found."
+            echo "Keystore secret found."
 
             mkdir -p android/app
 
@@ -279,17 +348,14 @@ jobs:
 
             echo "has_keystore=false" >> "$GITHUB_OUTPUT"
             echo "No release keystore configured."
-            echo "Debug/unsigned build will be used where applicable."
 
           fi
 
+
       # =============================================================
-      # DEBUG APK
+      # 15. BUILD DEBUG APK
       # =============================================================
 
-      # -------------------------------------------------------------
-      # 15. BUILD DEBUG APK
-      # -------------------------------------------------------------
       - name: 15. Build Debug APK
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
         run: |
@@ -305,9 +371,11 @@ jobs:
 
           echo "Debug APK build completed."
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 16. UPLOAD DEBUG APK
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 16. Upload Debug APK
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
         uses: actions/upload-artifact@v4
@@ -317,13 +385,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+
       # =============================================================
-      # RELEASE APK
+      # 17. BUILD RELEASE APK
       # =============================================================
 
-      # -------------------------------------------------------------
-      # 17. BUILD RELEASE APK
-      # -------------------------------------------------------------
       - name: 17. Build Release APK
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
         env:
@@ -343,9 +409,11 @@ jobs:
 
           echo "Release APK build completed."
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 18. UPLOAD RELEASE APK
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 18. Upload Release APK
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
         uses: actions/upload-artifact@v4
@@ -355,13 +423,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+
       # =============================================================
-      # RELEASE AAB
+      # 19. BUILD RELEASE AAB
       # =============================================================
 
-      # -------------------------------------------------------------
-      # 19. BUILD RELEASE AAB
-      # -------------------------------------------------------------
       - name: 19. Build Release AAB
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
         env:
@@ -381,9 +447,11 @@ jobs:
 
           echo "Release AAB build completed."
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 20. UPLOAD RELEASE AAB
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 20. Upload Release AAB
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
         uses: actions/upload-artifact@v4
@@ -393,9 +461,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      # -------------------------------------------------------------
+
+      # =============================================================
       # 21. BUILD SUMMARY
-      # -------------------------------------------------------------
+      # =============================================================
+
       - name: 21. Build Summary
         if: always()
         run: |
