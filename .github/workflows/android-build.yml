@@ -221,72 +221,35 @@ jobs:
 
           echo "Android project verified successfully."
 
-# -------------------------------------------------------------
-# 13. REPAIR GRADLE WRAPPER
-# -------------------------------------------------------------
-- name: 13. Repair Gradle Wrapper
-  run: |
-    echo "======================================"
-    echo "Repairing Gradle Wrapper"
-    echo "======================================"
+      # -------------------------------------------------------------
+      # 13. PREPARE GRADLE WRAPPER
+      # -------------------------------------------------------------
+      - name: 13. Prepare Gradle Wrapper
+        run: |
+          echo "======================================"
+          echo "Preparing Gradle Wrapper"
+          echo "======================================"
 
-    cd android
+          cd android
 
-    sed -i 's/\r$//' gradlew
-    chmod +x gradlew
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
 
-    echo "Current Gradle wrapper configuration:"
-    cat gradle/wrapper/gradle-wrapper.properties
+          echo "Gradle wrapper properties:"
+          cat gradle/wrapper/gradle-wrapper.properties
 
-    echo "Checking existing Gradle wrapper JAR..."
+          echo "Checking Gradle wrapper JAR..."
 
-    if java -jar gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
-      echo "Existing Gradle wrapper JAR is valid."
-    else
-      echo "::warning::Existing Gradle wrapper JAR is invalid."
-      echo "Generating a fresh Gradle 8.11.1 wrapper..."
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "::error::gradle-wrapper.jar is empty or missing."
+            exit 1
+          fi
 
-      TEMP_DIR=$(mktemp -d)
+          echo "Gradle wrapper JAR found."
 
-      cd "$TEMP_DIR"
+          echo "Testing Gradle wrapper..."
 
-      curl -L \
-        --fail \
-        --retry 3 \
-        --connect-timeout 20 \
-        -o gradle.zip \
-        https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
-
-      unzip -q gradle.zip
-
-      cd gradle-8.11.1
-
-      mkdir -p "$GITHUB_WORKSPACE/android/gradle/wrapper"
-
-      ./bin/gradle wrapper \
-        --gradle-version 8.11.1 \
-        --distribution-type all \
-        --no-daemon
-
-      cp gradle/wrapper/gradle-wrapper.jar \
-        "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
-
-      cp gradle/wrapper/gradle-wrapper.properties \
-        "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.properties"
-
-      echo "Fresh Gradle wrapper generated successfully."
-    fi
-
-    cd "$GITHUB_WORKSPACE/android"
-
-    chmod +x gradlew
-
-    echo "Final Gradle wrapper properties:"
-    cat gradle/wrapper/gradle-wrapper.properties
-
-    echo "Testing repaired Gradle wrapper..."
-
-    ./gradlew --version
+          ./gradlew --version
 
       # -------------------------------------------------------------
       # 14. DECODE RELEASE KEYSTORE
