@@ -103,7 +103,6 @@ jobs:
       - name: 7. Install Dependencies
         run: |
          npm install --legacy-peer-deps
-          fi
 
       # -------------------------------------------------------------
       # 8. VERIFY CAPACITOR CLI
