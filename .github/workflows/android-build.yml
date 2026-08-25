@@ -64,11 +64,18 @@ jobs:
           fi
           echo "Web build verified successfully."
 
+      # এখানে পুনরায় Node 22 ফোর্স নিশ্চিত করা হচ্ছে
+      - name: 7b. Ensure Node 22 for Capacitor
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: 8. Capacitor Sync Android
         env:
           CAPACITOR_TELEMETRY: "false"
           CI: "true"
         run: |
+          node -v
           echo "Syncing web assets to Capacitor Android project..."
           npx @capacitor/cli sync android
 
