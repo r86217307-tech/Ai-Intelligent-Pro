@@ -30,7 +30,7 @@ const defaultSettings: AssistantSettings = {
   voiceLanguage: 'en-US',
   voiceSpeed: 1.0,
   voiceVolume: 1.0,
-  continuousListening: true,
+  continuousListening: false,
   autoListening: false,
   interruptEnabled: true,
   soundEffects: true,

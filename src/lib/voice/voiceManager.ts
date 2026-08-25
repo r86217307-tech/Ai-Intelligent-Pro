@@ -226,7 +226,7 @@ export class VoiceManager {
         console.log(`[VoiceManager] Executing auto-reconnect attempt ${this.reconnectAttempt} (${delay}ms)...`);
         this.initialize(true).then(() => {
           if (this.continuousMode && this._connectionState === 'CONNECTED') {
-            this.startListening().catch(e => console.error('[VoiceManager] Resume listening failed:', e));
+            this.startListening().catch(e => console.warn('[VoiceManager] Resume listening failed:', e?.message || e));
           }
         }).catch(err => console.error('[VoiceManager] Reconnect error:', err));
       }, delay);
@@ -254,6 +254,9 @@ export class VoiceManager {
 
       // Guarantee single active microphone stream with a robust fallback if constraints fail
       if (!this.mediaStream || this.mediaStream.getTracks().some(t => t.readyState === 'ended')) {
+        if (!navigator?.mediaDevices?.getUserMedia) {
+          throw new Error('MediaDevices API not supported in this environment');
+        }
         try {
           this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
@@ -264,8 +267,14 @@ export class VoiceManager {
               sampleRate: 16000
             }
           });
-        } catch (initialErr) {
-          console.warn('[VoiceManager] Preferred microphone constraints failed, trying simple constraints:', initialErr);
+        } catch (initialErr: any) {
+          const errName = initialErr?.name || '';
+          const errMsg = initialErr?.message || '';
+          // If no physical microphone device exists or permission is outright denied, skip secondary constraint attempts
+          if (errName === 'NotFoundError' || errMsg.includes('device not found') || errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+            throw initialErr;
+          }
+          console.warn('[VoiceManager] Preferred microphone constraints failed, trying simple constraints:', errMsg || initialErr);
           try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
           } catch (fallbackErr) {
@@ -368,10 +377,11 @@ export class VoiceManager {
       
       this.setState('LISTENING');
     } catch (e: any) {
-      console.error('[VoiceManager] Microphone access denied or failed:', e);
+      console.warn('[VoiceManager] Microphone access denied or failed:', e?.message || e);
       const classified = ErrorRecoveryManager.classify(e, 'MICROPHONE_ERROR');
       if (this.onError) this.onError(classified.userMessageBn);
-      this.setState('ERROR');
+      this.setState('IDLE');
+      this.continuousMode = false;
     }
   }
 

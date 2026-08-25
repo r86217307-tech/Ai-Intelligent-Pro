@@ -15,6 +15,11 @@ on:
           - release_apk
           - release_aab
           - all
+      api_base_url:
+        description: 'Your deployed production API base URL (e.g. https://my-sufia-app.run.app)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -41,9 +46,9 @@ jobs:
 
       - name: 4. Build Production Web Application
         env:
-          VITE_API_BASE_URL: https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app
-          VITE_API_URL: https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app
-          VITE_DEFAULT_API_BASE_URL: https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app
+          VITE_API_BASE_URL: ${{ github.event.inputs.api_base_url || secrets.VITE_API_BASE_URL || 'https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app' }}
+          VITE_API_URL: ${{ github.event.inputs.api_base_url || secrets.VITE_API_BASE_URL || 'https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app' }}
+          VITE_DEFAULT_API_BASE_URL: ${{ github.event.inputs.api_base_url || secrets.VITE_API_BASE_URL || 'https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app' }}
         run: |
           echo "Building web application..."
           npm run build

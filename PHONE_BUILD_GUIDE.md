@@ -72,6 +72,33 @@ You can do this in **Chrome for Android** or via the official **GitHub Mobile Ap
 
 ---
 
+## 🌐 Connect to Your Real Deployed Production Backend (CRITICAL)
+
+The default API URL in AI Studio is the **Shared App Preview URL** (`https://ais-pre-...`). 
+Because of security:
+- This preview URL is **password-protected** by Google.
+- While it works perfectly in your web browser, **a native Android APK running on your phone does not have your Google login cookies**.
+- Therefore, Google blocks all API requests from the APK, causing the API connection to fail in your installed app.
+
+### How to Fix This:
+To make the APK connect to your backend successfully, you must host your backend on a **publicly accessible Cloud Run or Web Server** and compile the APK with your public URL.
+
+You can configure your real deployed production API URL in two ways:
+
+#### Method A: Triggering via GitHub Actions Input (Easiest)
+1. When you go to **Actions** → Run workflow on GitHub, you will see a new input field: **"Your deployed production API base URL"**.
+2. Paste your real deployed Cloud Run or server URL there (e.g., `https://my-sufia-app-xxxxxx.run.app`).
+3. Click **Run workflow**.
+
+#### Method B: Setting a GitHub Action Secret (Persistent)
+1. Go to your GitHub repository **Settings** → **Secrets and variables** → **Actions**.
+2. Click **New repository secret** (or repository variable).
+3. Name it: **`VITE_API_BASE_URL`**
+4. Set the value to your deployed production URL (e.g., `https://my-sufia-app-xxxxxx.run.app`).
+5. Now, all future pushes and builds will automatically use this URL without you having to enter it manually every time.
+
+---
+
 ## 🔒 Debug APK vs. Release APK vs. Release AAB
 
 | Artifact | Purpose | Signing Required? | Installation |
