@@ -109,6 +109,45 @@ app.use((req, res, next) => {
   }
 
   // Safe CORS handling
+  const origin = req.headers.origin;
+  if (origin) {
+    let allowed = false;
+    if (
+      origin.startsWith("capacitor://") || 
+      origin.startsWith("http://localhost") || 
+      origin.startsWith("https://localhost") || 
+      origin.startsWith("http://127.0.0.1")
+    ) {
+      allowed = true;
+    } else {
+      try {
+        const originUrl = new URL(origin);
+        const hostname = originUrl.hostname;
+        if (
+          hostname === "localhost" || 
+          hostname === "127.0.0.1" || 
+          hostname.endsWith(".run.app") || 
+          hostname.endsWith(".google.com")
+        ) {
+          allowed = true;
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    if (allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else {
+      // Dynamic origin fallback for static hosting web exports (Vercel, Netlify, etc.)
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
   if (req.method === "OPTIONS") {
@@ -536,9 +575,9 @@ PHASE 12 MARKET STRUCTURE DETECTION & DECISION RULES:
       
       // Fast Model Pipeline: Prioritize available environment model with zero-thinking ultra-fast vision
       const modelsToTry: { name: string; timeoutMs: number; zeroThinking?: boolean; thinkingLevel?: any }[] = [
-        { name: "gemini-3.7-flash", timeoutMs: 10000, zeroThinking: true },
-        { name: "gemini-flash-latest", timeoutMs: 10000, zeroThinking: true },
-        { name: "gemini-3.1-flash-lite", timeoutMs: 10000, zeroThinking: true },
+        { name: "gemini-3.7-flash", timeoutMs: 30000, zeroThinking: true },
+        { name: "gemini-2.5-flash", timeoutMs: 30000, zeroThinking: true },
+        { name: "gemini-3.1-flash-lite", timeoutMs: 30000, zeroThinking: true },
       ];
       
       let rawResponseText = "";

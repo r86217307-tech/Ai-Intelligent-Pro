@@ -11,6 +11,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState<HealthStatus>("CHECKING");
   const [latency, setLatency] = useState<number | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [uptime, setUptime] = useState<number | null>(null);
 
   const checkHealth = async () => {
     setHealthStatus("CHECKING");
@@ -21,17 +23,22 @@ export default function Dashboard() {
         headers: { "Cache-Control": "no-cache" }
       });
       if (res.ok) {
+        const data = await res.json();
         const endTime = performance.now();
         setLatency(Math.round(endTime - startTime));
+        setAiConfigured(!!data.aiConfigured);
+        setUptime(data.uptime);
         setHealthStatus("CONNECTED");
       } else {
         setHealthStatus("DISCONNECTED");
         setLatency(null);
+        setAiConfigured(null);
       }
     } catch (err) {
       console.warn("[Dashboard Health] Ping failed:", err);
       setHealthStatus("DISCONNECTED");
       setLatency(null);
+      setAiConfigured(null);
     }
   };
 
@@ -82,42 +89,56 @@ export default function Dashboard() {
       </div>
 
       {/* Real-time Network Diagnostic Checker */}
-      <div className="relative p-3.5 rounded-[1.5rem] border border-white/10 bg-black/45 flex items-center justify-between gap-3 overflow-hidden shadow-inner">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors border ${
-            healthStatus === "CONNECTED" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-            healthStatus === "DISCONNECTED" ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
-            "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse"
-          }`}>
-            <Activity className="w-4.5 h-4.5" />
+      <div className="relative p-3.5 rounded-[1.5rem] border border-white/10 bg-black/45 flex flex-col gap-2.5 overflow-hidden shadow-inner">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors border ${
+              healthStatus === "CONNECTED" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+              healthStatus === "DISCONNECTED" ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+              "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse"
+            }`}>
+              <Activity className="w-4.5 h-4.5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-white leading-none flex items-center gap-1.5">
+                API Connection
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                  healthStatus === "CONNECTED" ? "bg-emerald-400 animate-ping" :
+                  healthStatus === "DISCONNECTED" ? "bg-rose-500" :
+                  "bg-amber-400 animate-pulse"
+                }`} />
+              </span>
+              <span className="text-[9px] font-bold text-text-muted mt-1.5 tracking-wider uppercase">
+                {healthStatus === "CONNECTED" ? `CONNECTED • LATENCY: ${latency || 0}ms` :
+                 healthStatus === "DISCONNECTED" ? "LINK_FAILURE_DETECTED" :
+                 "PINGING_AUTHORITATIVE_API..."}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-black text-white leading-none flex items-center gap-1.5">
-              API Connection
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                healthStatus === "CONNECTED" ? "bg-emerald-400 animate-ping" :
-                healthStatus === "DISCONNECTED" ? "bg-rose-500" :
-                "bg-amber-400 animate-pulse"
-              }`} />
-            </span>
-            <span className="text-[9px] font-bold text-text-muted mt-1.5 tracking-wider uppercase">
-              {healthStatus === "CONNECTED" ? `CONNECTED • LATENCY: ${latency || 0}ms` :
-               healthStatus === "DISCONNECTED" ? "LINK_FAILURE_DETECTED" :
-               "PINGING_AUTHORITATIVE_API..."}
-            </span>
-          </div>
+          <button 
+            onClick={checkHealth}
+            disabled={healthStatus === "CHECKING"}
+            className={`px-3 py-1.5 rounded-xl font-bold text-[9px] tracking-widest uppercase transition-all duration-200 active:scale-95 ${
+              healthStatus === "CONNECTED" ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30" :
+              healthStatus === "DISCONNECTED" ? "bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 animate-bounce" :
+              "bg-white/5 text-text-muted border border-white/10"
+            }`}
+          >
+            {healthStatus === "CHECKING" ? "PINGING" : "TEST LINK"}
+          </button>
         </div>
-        <button 
-          onClick={checkHealth}
-          disabled={healthStatus === "CHECKING"}
-          className={`px-3 py-1.5 rounded-xl font-bold text-[9px] tracking-widest uppercase transition-all duration-200 active:scale-95 ${
-            healthStatus === "CONNECTED" ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30" :
-            healthStatus === "DISCONNECTED" ? "bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 animate-bounce" :
-            "bg-white/5 text-text-muted border border-white/10"
-          }`}
-        >
-          {healthStatus === "CHECKING" ? "PINGING" : "TEST LINK"}
-        </button>
+
+        {healthStatus === "CONNECTED" && (
+          <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-white/5 text-[9px] font-bold uppercase tracking-wider text-text-muted">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-emerald-400" />
+              <span>AI Engine: <span className={aiConfigured ? "text-emerald-400" : "text-rose-400"}>{aiConfigured ? "ONLINE" : "OFFLINE_KEY"}</span></span>
+            </div>
+            <div className="flex items-center justify-end gap-1.5">
+              <span>Uptime: <span className="text-white">{uptime !== null ? `${Math.floor(uptime / 60)}m` : "N/A"}</span></span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Daily Limit */}
