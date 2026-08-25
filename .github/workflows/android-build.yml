@@ -102,10 +102,7 @@ jobs:
       # -------------------------------------------------------------
       - name: 7. Install Dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --legacy-peer-deps
+         npm install --legacy-peer-deps
           fi
 
       # -------------------------------------------------------------
