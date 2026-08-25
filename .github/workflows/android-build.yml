@@ -1,14 +1,17 @@
-Name: Android Build Pipeline
+name: Android Build Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
+
   workflow_dispatch:
     inputs:
       build_target:
-        description: 'Target binary to build'
+        description: "Target binary to build"
         required: true
-        default: 'debug_apk'
+        default: "debug_apk"
         type: choice
         options:
           - debug_apk
@@ -26,104 +29,228 @@ jobs:
     timeout-minutes: 45
 
     steps:
+
+      # -------------------------------------------------------------
+      # 1. CHECKOUT
+      # -------------------------------------------------------------
       - name: 1. Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: 2. Setup Node.js Environment (v22)
+      # -------------------------------------------------------------
+      # 2. NODE.JS
+      # -------------------------------------------------------------
+      - name: 2. Setup Node.js 24 LTS
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "24"
+          cache: "npm"
 
-      - name: 3. Setup Java/JDK 21
+      # -------------------------------------------------------------
+      # 3. VERIFY NODE / NPM
+      # -------------------------------------------------------------
+      - name: 3. Verify Node.js Environment
+        run: |
+          echo "Node version:"
+          node --version
+
+          echo "NPM version:"
+          npm --version
+
+          echo "Node executable:"
+          which node
+
+          echo "NPM executable:"
+          which npm
+
+          node -e "console.log('Node major version:', process.versions.node.split('.')[0])"
+
+      # -------------------------------------------------------------
+      # 4. JAVA / JDK 21
+      # -------------------------------------------------------------
+      - name: 4. Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
-          cache-dependency-path: 'android/**/*.gradle*'
+          distribution: "temurin"
+          java-version: "21"
+          cache: "gradle"
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/**/gradle-wrapper.properties
 
-      - name: 4. Verify & Install Android SDK 36 Platform
+      # -------------------------------------------------------------
+      # 5. ANDROID SDK
+      # -------------------------------------------------------------
+      - name: 5. Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # -------------------------------------------------------------
+      # 6. INSTALL ANDROID SDK COMPONENTS
+      # -------------------------------------------------------------
+      - name: 6. Install Android SDK 36
         run: |
-          echo "Installing/verifying Android SDK Platform 36..."
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
+          echo "Installing Android SDK Platform 36..."
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
-      - name: 5. Install Dependencies
+          echo "Accepting Android SDK licenses..."
+          yes | sdkmanager --licenses > /dev/null || true
+
+      # -------------------------------------------------------------
+      # 7. INSTALL NPM DEPENDENCIES
+      # -------------------------------------------------------------
+      - name: 7. Install Dependencies
         run: |
-          npm ci || npm install --include=dev --legacy-peer-deps
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --legacy-peer-deps
+          fi
 
-      - name: 6. Build Production Web Application
+      # -------------------------------------------------------------
+      # 8. VERIFY CAPACITOR CLI
+      # -------------------------------------------------------------
+      - name: 8. Verify Capacitor CLI
+        run: |
+          echo "Node:"
+          node -v
+
+          echo "NPM:"
+          npm -v
+
+          echo "Capacitor CLI:"
+          npx cap --version
+
+      # -------------------------------------------------------------
+      # 9. BUILD WEB APPLICATION
+      # -------------------------------------------------------------
+      - name: 9. Build Production Web Application
         run: |
           echo "Building web application..."
           npm run build
 
-      - name: 7. Verify Web Build Artifacts
+      # -------------------------------------------------------------
+      # 10. VERIFY WEB BUILD
+      # -------------------------------------------------------------
+      - name: 10. Verify Web Build Artifacts
         run: |
-          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
-            echo "::error::Web build failed: dist/index.html not found"
+          if [ ! -d "dist" ]; then
+            echo "::error::dist directory not found."
             exit 1
           fi
+
+          if [ ! -f "dist/index.html" ]; then
+            echo "::error::dist/index.html not found."
+            exit 1
+          fi
+
           echo "Web build verified successfully."
+          echo "Contents of dist:"
+          ls -la dist
 
-      # এখানে পুনরায় Node 22 ফোর্স নিশ্চিত করা হচ্ছে
-      - name: 7b. Ensure Node 22 for Capacitor
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: 8. Capacitor Sync Android
+      # -------------------------------------------------------------
+      # 11. CAPACITOR SYNC
+      # -------------------------------------------------------------
+      - name: 11. Capacitor Sync Android
         env:
           CAPACITOR_TELEMETRY: "false"
           CI: "true"
         run: |
+          echo "Using Node:"
           node -v
-          echo "Syncing web assets to Capacitor Android project..."
-          npx @capacitor/cli sync android
 
-      - name: 9. Validate and Repair Gradle Wrapper
+          echo "Using Capacitor:"
+          npx cap --version
+
+          echo "Syncing web assets to Android..."
+          npx cap sync android
+
+      # -------------------------------------------------------------
+      # 12. VERIFY ANDROID PROJECT
+      # -------------------------------------------------------------
+      - name: 12. Verify Android Project
         run: |
-          echo "Inspecting Gradle Wrapper..."
-          sed -i 's/\r$//' android/gradlew
-          chmod +x android/gradlew
-          cd android
-          ls -la gradle/wrapper/gradle-wrapper.jar
-          
-          # Test if gradle-wrapper.jar can be executed by Java
-          if ! java -jar gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
-            echo "::warning::gradle-wrapper.jar is invalid or corrupted! Regenerating Gradle 8.11.1 Wrapper..."
-            gradle wrapper --gradle-version 8.11.1 --distribution-type all
-            chmod +x gradlew
-          else
-            echo "gradle-wrapper.jar is valid."
+          if [ ! -d "android" ]; then
+            echo "::error::Android directory not found."
+            exit 1
           fi
-          
-          echo "Verifying Gradle Wrapper..."
+
+          if [ ! -f "android/gradlew" ]; then
+            echo "::error::Gradle wrapper not found."
+            exit 1
+          fi
+
+          echo "Android project verified."
+
+      # -------------------------------------------------------------
+      # 13. SETUP GRADLE
+      # -------------------------------------------------------------
+      - name: 13. Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # -------------------------------------------------------------
+      # 14. PREPARE GRADLE WRAPPER
+      # -------------------------------------------------------------
+      - name: 14. Prepare Gradle Wrapper
+        run: |
+          cd android
+
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+          echo "Gradle wrapper properties:"
+          cat gradle/wrapper/gradle-wrapper.properties
+
+          echo "Testing Gradle wrapper..."
           ./gradlew --version
 
-      - name: 10. Decode Keystore (If CI Secrets Configured)
+      # -------------------------------------------------------------
+      # 15. DECODE RELEASE KEYSTORE
+      # -------------------------------------------------------------
+      - name: 15. Decode Keystore
         id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding release keystore from CI secret..."
+            echo "Release keystore secret found."
+
+            mkdir -p android/app
+
             echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
-            echo "has_keystore=true" >> $GITHUB_OUTPUT
+
+            if [ -s android/app/release.keystore ]; then
+              echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+              echo "Keystore decoded successfully."
+            else
+              echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+              echo "::warning::Keystore file is empty."
+            fi
           else
-            echo "Release keystore secret not found. Using debug/unsigned signing."
-            echo "has_keystore=false" >> $GITHUB_OUTPUT
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "No release keystore configured."
           fi
 
-      # -------------------------------------------------------------
-      # DEBUG APK BUILD
-      # -------------------------------------------------------------
-      - name: 11. Build Debug APK
+      # =============================================================
+      # DEBUG APK
+      # =============================================================
+
+      - name: 16. Build Debug APK
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
         run: |
           echo "Building Debug APK..."
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: 12. Upload Debug APK Artifact
+          cd android
+
+          ./gradlew assembleDebug \
+            --no-daemon \
+            --stacktrace
+
+      # -------------------------------------------------------------
+      # 17. UPLOAD DEBUG APK
+      # -------------------------------------------------------------
+      - name: 17. Upload Debug APK
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'debug_apk' || inputs.build_target == 'all' || inputs.build_target == '')) }}
         uses: actions/upload-artifact@v4
         with:
@@ -132,10 +259,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # -------------------------------------------------------------
-      # RELEASE APK BUILD
-      # -------------------------------------------------------------
-      - name: 13. Build Release APK
+      # =============================================================
+      # RELEASE APK
+      # =============================================================
+
+      - name: 18. Build Release APK
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -143,10 +271,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "Building Release APK..."
-          cd android
-          ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: 14. Upload Release APK Artifact
+          cd android
+
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace
+
+      # -------------------------------------------------------------
+      # 19. UPLOAD RELEASE APK
+      # -------------------------------------------------------------
+      - name: 19. Upload Release APK
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_apk' || inputs.build_target == 'all') }}
         uses: actions/upload-artifact@v4
         with:
@@ -155,21 +290,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # -------------------------------------------------------------
-      # RELEASE AAB BUILD (Google Play Store Bundle)
-      # -------------------------------------------------------------
-      - name: 15. Build Release AAB (Android App Bundle)
+      # =============================================================
+      # RELEASE AAB
+      # =============================================================
+
+      - name: 20. Build Release AAB
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "Building Release AAB Bundle for Play Store..."
-          cd android
-          ./gradlew bundleRelease --no-daemon --stacktrace
+          echo "Building Release AAB..."
 
-      - name: 16. Upload Release AAB Artifact
+          cd android
+
+          ./gradlew bundleRelease \
+            --no-daemon \
+            --stacktrace
+
+      # -------------------------------------------------------------
+      # 21. UPLOAD RELEASE AAB
+      # -------------------------------------------------------------
+      - name: 21. Upload Release AAB
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_target == 'release_aab' || inputs.build_target == 'all') }}
         uses: actions/upload-artifact@v4
         with:
@@ -177,3 +320,24 @@ jobs:
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: warn
           retention-days: 30
+
+      # -------------------------------------------------------------
+      # 22. BUILD SUMMARY
+      # -------------------------------------------------------------
+      - name: 22. Build Summary
+        if: always()
+        run: |
+          echo "======================================"
+          echo "Android Build Pipeline Finished"
+          echo "======================================"
+
+          echo "Node:"
+          node -v
+
+          echo "NPM:"
+          npm -v
+
+          echo "Java:"
+          java -version
+
+          echo "======================================"
