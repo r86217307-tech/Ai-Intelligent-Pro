@@ -57,7 +57,7 @@ export class VisionManager {
       const now = Date.now();
       this.state.latestFrameTimestamp = now;
       latencyTelemetry.recordFrameCapture();
-      
+
       // Update vision context metadata & lightweight change detection
       visionContextManager.registerFrame(1280, 720, mimeType, base64Image);
       this.state.visualContext = visionContextManager.getContext();
@@ -76,7 +76,7 @@ export class VisionManager {
       visionContextManager.setSharingActive(false);
       this.pendingFrame = null;
       this.isFrameTransmitting = false;
-      
+
       const classified = ErrorRecoveryManager.classify(error, 'VISION_ERROR');
       this.state = {
         ...this.state,
@@ -90,11 +90,12 @@ export class VisionManager {
     };
   }
 
-  private transmitFrame(base64Image: string, mimeType: string) {
+  private async transmitFrame(base64Image: string, mimeType: string) {
     this.isFrameTransmitting = true;
     latencyTelemetry.recordFrameTransmitted();
 
-    const sent = voiceManager.sendMediaFrame(base64Image, mimeType);
+    // ফিক্সড: এখানে await যুক্ত করা হয়েছে যাতে WebSocket কানেকশন না থাকলে তা তৈরি হয়ে তারপর ডেটা পাঠায়
+    const sent = await voiceManager.sendMediaFrame(base64Image, mimeType);
     if (sent) {
       latencyTelemetry.recordFrameProcessed();
     }
