@@ -16,30 +16,44 @@ export default function Dashboard() {
 
   const checkHealth = async () => {
     setHealthStatus("CHECKING");
-    const startTime = performance.now();
-    try {
-      const res = await fetch(getApiUrl("/api/health"), {
-        method: "GET",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const endTime = performance.now();
-        setLatency(Math.round(endTime - startTime));
-        setAiConfigured(!!data.aiConfigured);
-        setUptime(data.uptime);
-        setHealthStatus("CONNECTED");
-      } else {
-        setHealthStatus("DISCONNECTED");
-        setLatency(null);
-        setAiConfigured(null);
+    const maxAttempts = 3;
+    let delayBetweenAttempts = 1500;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const startTime = performance.now();
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const res = await fetch(getApiUrl("/api/health"), {
+          method: "GET",
+          headers: { "Cache-Control": "no-cache" },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (res.ok) {
+          const data = await res.json();
+          const endTime = performance.now();
+          setLatency(Math.round(endTime - startTime));
+          setAiConfigured(!!data.aiConfigured);
+          setUptime(data.uptime);
+          setHealthStatus("CONNECTED");
+          return;
+        }
+      } catch (err: any) {
+        console.warn(`[Dashboard Health] Attempt ${attempt} failed:`, err?.message || err);
       }
-    } catch (err) {
-      console.warn("[Dashboard Health] Ping failed:", err);
-      setHealthStatus("DISCONNECTED");
-      setLatency(null);
-      setAiConfigured(null);
+      
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
+        delayBetweenAttempts *= 2;
+      }
     }
+    
+    setHealthStatus("DISCONNECTED");
+    setLatency(null);
+    setAiConfigured(null);
   };
 
   useEffect(() => {
