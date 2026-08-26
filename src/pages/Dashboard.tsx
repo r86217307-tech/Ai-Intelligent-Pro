@@ -153,6 +153,18 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {healthStatus === "DISCONNECTED" && (
+          <div className="flex items-center justify-between mt-1 pt-2 border-t border-rose-500/10 text-[10px]">
+            <span className="text-rose-400/80">Backend host unreachable</span>
+            <button
+              onClick={() => navigate('/settings')}
+              className="text-cyan-400 hover:text-cyan-300 font-bold underline transition-colors"
+            >
+              Configure Server in Settings →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Daily Limit */}

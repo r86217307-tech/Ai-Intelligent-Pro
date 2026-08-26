@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Save, RotateCcw, Zap, Sliders, Shield, Volume2, History, AlertTriangle, CheckCircle2, Brain, Trash2 } from "lucide-react";
+import { 
+  Settings as SettingsIcon, 
+  Save, 
+  RotateCcw, 
+  Zap, 
+  Sliders, 
+  Shield, 
+  Volume2, 
+  History, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Brain, 
+  Trash2,
+  Server,
+  Globe,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  ExternalLink
+} from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
@@ -8,6 +27,7 @@ import { AppSettings } from "../types";
 import { DEFAULT_SETTINGS, getStoredSettings, saveStoredSettings } from "../lib/settings";
 import { memoryManager } from "../lib/memory/memoryManager";
 import { MemoryItem } from "../lib/memory/memoryTypes";
+import { testApiConnection, getApiBaseUrl, HealthCheckResult, PRODUCTION_URL } from "../lib/api";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -16,10 +36,38 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [memories, setMemories] = useState<MemoryItem[]>([]);
+  
+  // API Connection Test State
+  const [testingApi, setTestingApi] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState<HealthCheckResult | null>(null);
 
   useEffect(() => {
     setMemories(memoryManager.getAllValidMemories());
   }, []);
+
+  const handleTestApi = async () => {
+    setTestingApi(true);
+    setApiTestResult(null);
+    try {
+      const result = await testApiConnection(settings.customApiUrl);
+      setApiTestResult(result);
+      if (result.ok) {
+        toast.success(`Connected successfully! Latency: ${result.latency}ms`);
+      } else {
+        toast.error(result.error || "Connection test failed");
+      }
+    } catch (e: any) {
+      setApiTestResult({
+        ok: false,
+        status: "DISCONNECTED",
+        error: e?.message || "Failed to reach server",
+        endpointUrl: settings.customApiUrl || getApiBaseUrl()
+      });
+      toast.error("Failed to reach server");
+    } finally {
+      setTestingApi(false);
+    }
+  };
 
   const handleDeleteMemory = (id: string) => {
     memoryManager.deleteMemory(id);
@@ -354,6 +402,141 @@ export default function Settings() {
                 className="bg-surface border border-border rounded-xl p-3 text-xs text-white outline-none focus:border-primary font-bold"
               />
             </div>
+          </div>
+        </div>
+
+        {/* SECTION 4: SYSTEM & API SERVER CONNECTION */}
+        <div className="glass-panel p-5 md:p-6 rounded-3xl space-y-5 border border-cyan-500/20 bg-cyan-950/10 relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-cyan-400" />
+              <h3 className="font-black text-white text-sm tracking-wide uppercase">System & API Connection</h3>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border ${
+              settings.customApiUrl 
+                ? "text-cyan-300 bg-cyan-500/20 border-cyan-500/40" 
+                : "text-text-muted bg-white/5 border-white/10"
+            }`}>
+              {settings.customApiUrl ? "Custom Endpoint" : "Default Host"}
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-text-muted font-bold uppercase tracking-wider flex items-center justify-between">
+                <span>Backend Server URL</span>
+                <span className="text-[9px] text-cyan-400 font-mono">Active: {getApiBaseUrl() || "Same-Origin (Default)"}</span>
+              </label>
+              
+              <div className="relative">
+                <input
+                  type="url"
+                  placeholder="e.g. https://my-sufia-backend.run.app or http://localhost:3000"
+                  value={settings.customApiUrl || ""}
+                  onChange={(e) => {
+                    setSettings({ ...settings, customApiUrl: e.target.value.trim() });
+                    setApiTestResult(null);
+                  }}
+                  className="w-full bg-surface border border-border focus:border-cyan-400 rounded-xl p-3 text-xs text-white outline-none font-mono transition-colors pr-24"
+                />
+                
+                {settings.customApiUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettings({ ...settings, customApiUrl: "" });
+                      setApiTestResult(null);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] font-bold text-text-muted hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11px] text-text-muted leading-relaxed">
+                When running as a standalone Android APK, enter your publicly deployed server URL above so the mobile app can connect directly to your backend.
+              </p>
+            </div>
+
+            {/* Test Connection Action Button */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleTestApi}
+                disabled={testingApi}
+                className="flex-1 py-3 px-4 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 hover:border-cyan-400 text-cyan-200 text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testingApi ? "animate-spin text-cyan-400" : ""}`} />
+                {testingApi ? "Checking Server Link..." : "Test Connection"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSettings({ ...settings, customApiUrl: "" });
+                  setApiTestResult(null);
+                  toast.success("Reset API server to default host");
+                }}
+                className="py-3 px-3 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-bold uppercase transition-all"
+                title="Reset to default system host"
+              >
+                Reset Default
+              </button>
+            </div>
+
+            {/* Test Result Live Feedback Panel */}
+            {apiTestResult && (
+              <div className={`p-4 rounded-2xl border transition-all animate-in fade-in duration-200 ${
+                apiTestResult.ok 
+                  ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-300" 
+                  : "bg-rose-950/30 border-rose-500/40 text-rose-300"
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    {apiTestResult.ok ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                    )}
+                    <div>
+                      <h4 className="text-xs font-bold text-white">
+                        {apiTestResult.ok ? "Server Connection Verified (Online)" : "Connection Failed (Unreachable)"}
+                      </h4>
+                      <p className="text-[11px] text-text-muted font-mono mt-0.5 break-all">
+                        Target: {apiTestResult.endpointUrl || "Default Endpoint"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {apiTestResult.ok && apiTestResult.latency !== undefined && (
+                    <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-lg shrink-0">
+                      {apiTestResult.latency} ms
+                    </span>
+                  )}
+                </div>
+
+                {apiTestResult.ok ? (
+                  <div className="mt-3 pt-3 border-t border-emerald-500/20 grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-text-muted">AI Configuration: </span>
+                      <span className="font-bold text-emerald-300">{apiTestResult.aiConfigured ? "Active (Gemini 2.5/Flash)" : "Standby"}</span>
+                    </div>
+                    <div>
+                      <span className="text-text-muted">Uptime: </span>
+                      <span className="font-mono text-emerald-300">{apiTestResult.uptime ? `${apiTestResult.uptime}s` : "Online"}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[11px] text-rose-200">
+                    <p className="font-semibold">Reason: {apiTestResult.error}</p>
+                    <p className="text-[10px] text-text-muted mt-1">
+                      Tip: Ensure your server is deployed with public access, or check for typos in the URL (must include https://).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

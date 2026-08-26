@@ -1,11 +1,28 @@
 /**
  * Central API Endpoint Client for Sufia AI Trader
  * 
- * Enforces production URL usage to completely avoid any localhost calls in Android / Capacitor builds.
+ * Enforces production URL usage to completely avoid any localhost calls in Android / Capacitor builds,
+ * while allowing user-configured custom API endpoints via in-app Settings.
  */
 
 // Forced production fallback URL
 export const PRODUCTION_URL = "https://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app";
+
+export const getCustomApiBaseUrl = (): string => {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = localStorage.getItem("coco_settings_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.customApiUrl && typeof parsed.customApiUrl === "string" && parsed.customApiUrl.trim() !== "") {
+        return parsed.customApiUrl.trim().replace(/\/$/, "");
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to retrieve custom API URL from settings:", e);
+  }
+  return "";
+};
 
 export const isAndroidCapacitor = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -20,7 +37,7 @@ export const isAndroidCapacitor = (): boolean => {
     Boolean((window as any).Capacitor) || 
     Boolean((window as any).AndroidBridge) ||
     ua.includes("capacitor") ||
-    ua.includes("android") && (protocol === "file:" || protocol === "capacitor:");
+    (ua.includes("android") && (protocol === "file:" || protocol === "capacitor:"));
 
   const isCustomProtocol = protocol === "capacitor:" || protocol === "file:";
 
@@ -32,12 +49,25 @@ export const isAndroidCapacitor = (): boolean => {
 };
 
 export const getApiBaseUrl = (): string => {
-  // If running in Android/Capacitor build, strictly bypass any localhost detection and use production URL
-  if (isAndroidCapacitor()) {
-    return import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_DEFAULT_API_BASE_URL || PRODUCTION_URL;
+  // 0. User-configured Custom API URL from Settings takes top priority
+  const customUrl = getCustomApiBaseUrl();
+  if (customUrl) {
+    return customUrl;
   }
 
-  // 1. If we are running in a web browser, default to same-origin relative path to ensure cookies/sessions match perfectly.
+  // 1. If running in Android/Capacitor build, use environment variable or production URL
+  if (isAndroidCapacitor()) {
+    const envUrl = 
+      import.meta.env.VITE_API_BASE_URL || 
+      import.meta.env.VITE_DEFAULT_API_BASE_URL || 
+      import.meta.env.VITE_API_URL;
+    if (envUrl) {
+      return envUrl.endsWith("/") ? envUrl.slice(0, -1) : envUrl;
+    }
+    return PRODUCTION_URL;
+  }
+
+  // 2. If we are running in a web browser, default to same-origin relative path to ensure cookies/sessions match perfectly.
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     const port = window.location.port;
@@ -56,7 +86,7 @@ export const getApiBaseUrl = (): string => {
     return "";
   }
 
-  // 2. Fallback to explicit environment variable (e.g. for static hosting exports)
+  // 3. Fallback to explicit environment variable (e.g. for static hosting exports)
   const baseFromEnv = 
     import.meta.env.VITE_API_BASE_URL || 
     import.meta.env.VITE_API_URL || 
@@ -85,7 +115,7 @@ export const getWebSocketUrl = (path: string): string => {
   
   if (baseUrl) {
     // Correctly convert HTTP/HTTPS base URL to WS/WSS
-    const wsBaseUrl = baseUrl.replace(/^http/, "ws");
+    const wsBaseUrl = baseUrl.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
     return `${wsBaseUrl}${cleanPath}`;
   }
 
@@ -97,3 +127,65 @@ export const getWebSocketUrl = (path: string): string => {
 
   return `wss://ais-pre-xx57rykxlx4qvpsbs45okj-627265381449.asia-southeast1.run.app${cleanPath}`;
 };
+
+export interface HealthCheckResult {
+  ok: boolean;
+  status: "CONNECTED" | "DISCONNECTED" | "CHECKING";
+  latency?: number;
+  uptime?: number;
+  aiConfigured?: boolean;
+  error?: string;
+  endpointUrl: string;
+}
+
+export const testApiConnection = async (targetBaseUrl?: string): Promise<HealthCheckResult> => {
+  let endpoint = "";
+  if (targetBaseUrl && targetBaseUrl.trim() !== "") {
+    endpoint = targetBaseUrl.trim().replace(/\/$/, "");
+  } else {
+    endpoint = getApiBaseUrl();
+  }
+
+  const pingUrl = endpoint ? `${endpoint}/api/health` : "/api/health";
+  const startTime = performance.now();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch(pingUrl, {
+      method: "GET",
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const endTime = performance.now();
+      return {
+        ok: true,
+        status: "CONNECTED",
+        latency: Math.round(endTime - startTime),
+        uptime: data.uptime,
+        aiConfigured: !!data.aiConfigured,
+        endpointUrl: endpoint || window.location.origin
+      };
+    } else {
+      return {
+        ok: false,
+        status: "DISCONNECTED",
+        error: `Server responded with HTTP status ${res.status}`,
+        endpointUrl: endpoint || window.location.origin
+      };
+    }
+  } catch (err: any) {
+    return {
+      ok: false,
+      status: "DISCONNECTED",
+      error: err?.name === "AbortError" ? "Connection timed out after 8s" : (err?.message || "Network request failed"),
+      endpointUrl: endpoint || (typeof window !== "undefined" ? window.location.origin : "")
+    };
+  }
+};
+

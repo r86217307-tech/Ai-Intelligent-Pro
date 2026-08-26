@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   resultDisplay: "STANDARD",
   testModeDefaultBroker: "Quotex",
   testModeAutoEvaluate: true,
+  customApiUrl: "",
 };
 
 const SETTINGS_KEY = "coco_settings_v1";

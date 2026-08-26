@@ -124,6 +124,7 @@ export interface AppSettings {
   resultDisplay: "STANDARD" | "COMPACT";
   testModeDefaultBroker?: string;
   testModeAutoEvaluate?: boolean;
+  customApiUrl?: string;
 }
 
 export interface ForexNewsItem {
